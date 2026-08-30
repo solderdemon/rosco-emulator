@@ -15,7 +15,20 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Followed through any symlinks first: the container puts these scripts on the
+# PATH as /usr/local/bin/rosco-smoke-test and friends, pointing at the real
+# copies under /opt/rosco, and the tree they belong to is the one at the far
+# end of the link.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+	link="$(readlink "$self")"
+	case "$link" in
+		/*) self="$link" ;;
+		*)  self="$(dirname "$self")/$link" ;;
+	esac
+done
+
+ROOT="$(cd "$(dirname "$self")/.." && pwd)"
 EMU="$ROOT/rosco"
 
 machine=""
