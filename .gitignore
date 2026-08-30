@@ -22,5 +22,6 @@
 !/*.md
 !/*.bdf
 !/COPYING
+!/roms/
 /.idea
 .vscode
