@@ -17,8 +17,8 @@
 # NOWERROR = 1
 # IGNORE_GIT = 1
 
-# TARGET = mame
-# SUBTARGET = tiny
+# TARGET = rosco
+# SUBTARGET = rosco
 # TOOLS = 1
 # EMULATOR = 1
 # TESTS = 1
@@ -276,7 +276,7 @@ TARGET := $(PROJECT)
 endif
 
 ifndef TARGET
-TARGET := mame
+TARGET := rosco
 endif
 
 ifndef SUBTARGET
@@ -1542,16 +1542,6 @@ ifdef IGNORE_BAD_LOCALISATION
 else
 	$(SILENT)$(PYTHON) scripts/build/msgfmt.py --output-file $@ $<
 endif
-
-#-------------------------------------------------
-# Regression tests
-#-------------------------------------------------
-
-include regtests/regtests.mak
-
-.PHONY: tests
-
-tests: $(REGTESTS)
 
 #-------------------------------------------------
 # Source cleanup

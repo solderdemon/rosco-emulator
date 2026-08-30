@@ -1,101 +1,90 @@
-# MAME
+# rosco-emulator
 
-## What is MAME?
+An emulator for the [rosco_m68k](https://github.com/rosco-m68k/rosco_m68k) family of homebrew
+single board computers, built as a slimmed-down MAME target.
 
-MAME is a multi-purpose emulation framework.
+This tree is MAME 0.289 with everything unrelated to rosco removed. The only
+driver that remains lives in `src/rosco/drivers`, and the build produces a
+single `rosco` executable instead of the full MAME binary.
 
-MAME's purpose is to preserve decades of software history. As electronic technology continues to rush forward, MAME prevents this important "vintage" software from being lost and forgotten. This is achieved by documenting the hardware and how it functions. The source code to MAME serves as this documentation. The fact that the software is usable serves primarily to validate the accuracy of the documentation (how else can you prove that you have recreated the hardware faithfully?). Over time, MAME (originally stood for Multiple Arcade Machine Emulator) absorbed the sister-project MESS (Multi Emulator Super System), so MAME now documents a wide variety of (mostly vintage) computers, video game consoles and calculators, in addition to the arcade video games that were its initial focus.
+The rosco driver originates from the SBC MAME fork at
+[roscopeco/mame](https://github.com/roscopeco/mame), which is where the
+rosco_m68k machines were first emulated. It has been ported forward to current
+MAME here - see [Credits](#credits).
 
-## Where can I find out more?
+## Emulated systems
 
-* [Official MAME Development Team Site](https://www.mamedev.org/) (includes binary downloads, wiki, forums, and more)
-* [MAME Testers](https://mametesters.org/) (official bug tracker for MAME)
+| Short name       | Description                    |
+| ---------------- | ------------------------------ |
+| `rosco_m68k_000` | rosco_m68k Classic V2, MC68000 |
+| `rosco_m68k_010` | rosco_m68k Classic V2, MC68010 |
+| `rosco_m68k_020` | rosco_m68k Classic V2, MC68020 |
+| `rosco_m68k_030` | rosco_m68k Classic V2, MC68030 |
 
-### Community
+The Classic V2 machines emulate 1MB of DRAM, the XR68C681 DUART with both
+serial channels, the bit-banged SPI SD card hanging off the DUART output port,
+and the IDE/ATA interface. Unmapped addresses raise a bus error, which is what
+the firmware uses to size memory and probe for expansion hardware.
 
-* [r/MAME](https://www.reddit.com/r/MAME/) on Reddit
-* [MAMEdev Forum](https://forum.mamedev.org/)
-* [MAMEdev Discussions](https://github.com/orgs/mamedev/discussions) on GitHub
+CPU cores for both the 68000 family and the W65C02S are enabled in the build,
+the latter so that a `rosco_6502` driver can be added later without touching the
+target configuration.
 
-## Development
+## Building
 
-![Alt](https://repobeats.axiom.co/api/embed/8461d8ae4630322dafc736fc25782de214b49630.svg "Repobeats analytics image")
+Requires a C++20 compiler, Python 3, SDL2 and the usual MAME build dependencies.
 
-### CI status and code scanning
-
-[![CI (Linux)](https://github.com/mamedev/mame/workflows/CI%20(Linux)/badge.svg)](https://github.com/mamedev/mame/actions/workflows/ci-linux.yml) [![CI (Windows](https://github.com/mamedev/mame/workflows/CI%20(Windows)/badge.svg)](https://github.com/mamedev/mame/actions/workflows/ci-windows.yml) [![CI (macOS)](https://github.com/mamedev/mame/workflows/CI%20(macOS)/badge.svg)](https://github.com/mamedev/mame/actions/workflows/ci-macos.yml) [![Compile UI translations](https://github.com/mamedev/mame/workflows/Compile%20UI%20translations/badge.svg)](https://github.com/mamedev/mame/actions/workflows/language.yml) [![Build documentation](https://github.com/mamedev/mame/workflows/Build%20documentation/badge.svg)](https://github.com/mamedev/mame/actions/workflows/docs.yml)  [![Coverity Scan Status](https://scan.coverity.com/projects/5727/badge.svg?flat=1)](https://scan.coverity.com/projects/mame-emulator)
-
-### How to compile?
-
-If you're on a UNIX-like system (including Linux and macOS), it could be as easy as typing
-
-```
-make
-```
-
-for a full build,
-
-```
-make SUBTARGET=tiny
-```
-
-for a build including a small subset of supported systems.
-
-See the [Compiling MAME](http://docs.mamedev.org/initialsetup/compilingmame.html) page on our documentation site for more information, including prerequisites for macOS and popular Linux distributions.
-
-For recent versions of macOS you need to install [Xcode](https://developer.apple.com/xcode/) including command-line tools and [SDL 2.0](https://github.com/libsdl-org/SDL/releases/latest).
-
-For Windows users, we provide a ready-made [build environment](http://www.mamedev.org/tools/) based on MinGW-w64.
-
-Visual Studio builds are also possible, but you still need [build environment](http://www.mamedev.org/tools/) based on MinGW-w64.
-In order to generate solution and project files just run:
-
-```
-make vs2022
-```
-or use this command to build it directly using msbuild
-
-```
-make vs2022 MSBUILD=1
+```sh
+make -j$(nproc)
 ```
 
-### Coding standard
+`rosco` is the default target, so no `TARGET=` is needed. The resulting binary is
+`./rosco` in the top of the tree.
 
-MAME source code should be viewed and edited with your editor set to use four spaces per tab. Tabs are used for initial indentation of lines, with one tab used per indentation level. Spaces are used for other alignment within a line.
+## Firmware
 
-Some parts of the code follow [Allman style](https://en.wikipedia.org/wiki/Indent_style#Allman_style); some parts of the code follow [K&R style](https://en.wikipedia.org/wiki/Indent_style#K.26R_style) -- mostly depending on who wrote the original version. **Above all else, be consistent with what you modify, and keep whitespace changes to a minimum when modifying existing source.** For new code, the majority tends to prefer Allman style, so if you don't care much, use that.
+The rosco_m68k firmware is built from source by its users rather than being a
+fixed ROM dump, so `roms/rosco_m68k_<cpu>.zip` just needs to contain whatever
+`rosco_m68k.rom` you want to run. The hashes in `src/rosco/drivers/rosco_m68k.cpp`
+describe the build that this tree was tested against; if you drop in your own
+firmware, either update them or start the emulator with `-novalidate`.
 
-All contributors need to either add a standard header for license info (on new files) or inform us of their wishes regarding which of the following licenses they would like their code to be made available under: the [BSD-3-Clause](http://opensource.org/licenses/BSD-3-Clause) license, the [LGPL-2.1](http://opensource.org/licenses/LGPL-2.1), or the [GPL-2.0](http://opensource.org/licenses/GPL-2.0).
+## Running
 
-See more specific [C++ Coding Guidelines](https://docs.mamedev.org/contributing/cxx.html) on our documentation web site.
+```sh
+# interactive, with the built-in terminal
+./rosco rosco_m68k_010
+
+# headless, with the console redirected to a file
+./rosco rosco_m68k_010 -terminal null_modem -bitb console.txt -video none
+
+# attach a pseudo-terminal instead, and talk to it with screen/minicom
+./rosco rosco_m68k_010 -terminal pty
+```
+
+Both serial ports default to 115200 8N1, matching the firmware.
+
+An SD card image goes on the first hard disk slot and the IDE disk on the second:
+
+```sh
+./rosco rosco_m68k_010 -hard1 sdcard.img -hard2 ide.chd
+```
+
+Raw images work as-is; `.chd` images can be created with `chdman`, built by
+`make TOOLS=1`.
+
+## Credits
+
+The rosco_m68k drivers come from the SBC MAME fork,
+[roscopeco/mame](https://github.com/roscopeco/mame), by Ross Bamford and
+contributors, with portions by Chris Hanson. Porting them to MAME 0.289
+required updating the bus error handling for the rewritten 68000 core and the
+usual API churn; the hardware emulation itself is theirs.
+
+The rosco_m68k computer itself is by
+[The Really Old-School Company](https://github.com/rosco-m68k/rosco_m68k).
 
 ## License
 
-The MAME project as a whole is made available under the terms of the
-[GNU General Public License, version 2](http://opensource.org/licenses/GPL-2.0)
-or later (GPL-2.0+), since it contains code made available under multiple
-GPL-compatible licenses.  A great majority of the source files (over 90%
-including core files) are made available under the terms of the
-[3-clause BSD License](http://opensource.org/licenses/BSD-3-Clause), and we
-would encourage new contributors to make their contributions available under the
-terms of this license.
-
-Please note that MAME is a registered trademark of Gregory Ember, and permission
-is required to use the "MAME" name, logo, or wordmark.
-
-<a href="http://opensource.org/licenses/GPL-2.0" target="_blank">
-<img align="right" width="100" src="https://opensource.org/wp-content/uploads/2009/06/OSIApproved.svg">
-</a>
-
-    Copyright (c) 1997-2026  MAMEdev and contributors
-
-    This program is free software; you can redistribute it and/or modify it
-    under the terms of the GNU General Public License version 2, as provided in
-    docs/legal/GPL-2.0.
-
-    This program is distributed in the hope that it will be useful, but WITHOUT
-    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-    more details.
-
-Please see [COPYING](COPYING) for more details.
+MAME is distributed under the terms in `COPYING` (GPL-2.0-or-later). The rosco
+drivers carry their own MIT / BSD-3-Clause notices in their source headers.

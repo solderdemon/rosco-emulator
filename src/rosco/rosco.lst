@@ -1,0 +1,16 @@
+// license:BSD-3-Clause
+// copyright-holders:Aaron Giles
+/******************************************************************************
+
+    rosco.lst
+
+    List of all enabled drivers in the system. This file is parsed by
+    makelist.exe, sorted, and output as C code describing the drivers.
+
+******************************************************************************/
+
+// rosco_m68k Classic / Classic v2
+rosco_m68k_000
+rosco_m68k_010
+rosco_m68k_020
+rosco_m68k_030
