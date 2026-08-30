@@ -27,6 +27,11 @@ done
 ROOT="$(cd "$(dirname "$self")/.." && pwd)"
 EMU="$ROOT/rosco"
 
+# The SDL OSD opens a video device whatever -video says and exits if it cannot,
+# so on a machine with no display - a container, a build box - point it at the
+# driver that needs none. Every run here is headless.
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-dummy}"
+
 seconds=8
 
 usage()

@@ -72,12 +72,13 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 COPY --from=builder /src/rosco			/opt/rosco/rosco
 COPY --from=builder /src/scripts/rosco-test.sh	/opt/rosco/scripts/rosco-test.sh
 COPY --from=builder /src/scripts/smoke-test.sh	/opt/rosco/scripts/smoke-test.sh
+COPY --from=builder /src/scripts/docker-entrypoint.sh	/opt/rosco/scripts/docker-entrypoint.sh
 COPY --from=builder /src/roms			/opt/rosco/roms
 COPY --from=builder /src/bgfx			/opt/rosco/bgfx
 COPY --from=builder /src/COPYING		/opt/rosco/COPYING
 COPY --from=builder /src/README.md		/opt/rosco/README.md
 
-RUN ln -s /opt/rosco/rosco /usr/local/bin/rosco \
+RUN ln -s /opt/rosco/scripts/docker-entrypoint.sh /usr/local/bin/rosco \
 	&& ln -s /opt/rosco/scripts/rosco-test.sh /usr/local/bin/rosco-test \
 	&& ln -s /opt/rosco/scripts/smoke-test.sh /usr/local/bin/rosco-smoke-test
 
@@ -112,5 +113,5 @@ LABEL org.opencontainers.image.title="rosco-emulator" \
       org.opencontainers.image.source="https://github.com/solderdemon/rosco-emulator" \
       org.opencontainers.image.licenses="GPL-2.0-or-later"
 
-ENTRYPOINT ["/opt/rosco/rosco"]
+ENTRYPOINT ["/opt/rosco/scripts/docker-entrypoint.sh"]
 CMD ["-help"]

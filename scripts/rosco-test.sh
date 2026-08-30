@@ -134,6 +134,11 @@ if [ "$interactive" -eq 1 ]; then
 	exec "$EMU" "${args[@]}" "$@"
 fi
 
+# The SDL OSD opens a video device whatever -video says and exits if it cannot,
+# so a headless run on a machine with no display - a container, a build box -
+# needs the driver that needs none.
+export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-dummy}"
+
 # Headless: the console comes out of the DUART's channel A into a bitbanger.
 console="$work/console.txt"
 : > "$console"
