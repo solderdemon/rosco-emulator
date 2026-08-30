@@ -1,0 +1,15 @@
+# The build tree, the binary and MAME's runtime output are all rebuilt inside
+# the image, and .git is 1.9GB that the build does not need - without it the
+# makefile just stamps the version as "unknown".
+.git
+.github
+build/
+.ccache/
+rosco
+cfg/
+nvram/
+snap/
+diff/
+*.o
+*.chd
+*.img

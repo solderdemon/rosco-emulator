@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Everything else MAME needs is bundled in 3rdparty/ and built from
+      # source. Qt is skipped: USE_QTDEBUG=0 below builds the SDL debugger
+      # instead, which is one less thing to install and to link against.
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential python3 pkg-config ccache \
+            libsdl2-dev libsdl2-ttf-dev libfontconfig-dev \
+            libx11-dev libxinerama-dev libxext-dev libxi-dev libgl-dev \
+            libasound2-dev libpulse-dev
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      # REGENIE=1 because the makefile does not notice these options changing
+      # between runs, and a restored ccache brings the generated project files
+      # along with it.
+      - name: Build
+        run: |
+          make -j"$(nproc)" REGENIE=1 \
+            USE_QTDEBUG=0 SYMBOLS=0 STRIP_SYMBOLS=1 \
+            OVERRIDE_CC="ccache gcc" OVERRIDE_CXX="ccache g++"
+
+      - name: ccache statistics
+        run: ccache --show-stats
+
+      - name: Smoke test
+        run: scripts/smoke-test.sh
+
+      - name: Upload the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rosco-linux-x86_64
+          path: rosco
+          retention-days: 14

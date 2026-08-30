@@ -1,0 +1,137 @@
+name: Release
+
+# Tagging v1.2.3 builds the image, checks it boots, pushes it to Docker Hub as
+# 1.2.3, 1.2 and latest, and attaches the binary that came out of that same
+# build to a GitHub release. Running the workflow by hand pushes an "edge" tag
+# and makes no release.
+#
+# The image is solderdemon/rosco-emulator, which the DOCKERHUB_IMAGE
+# repository variable overrides if it ever moves.
+#
+# Needs two repository secrets to push anything: DOCKERHUB_USERNAME and
+# DOCKERHUB_TOKEN (an access token from Docker Hub, not the account password).
+# Without the secrets the image is still built and tested, just not published.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Docker Hub tag to push
+        default: edge
+
+permissions:
+  contents: write
+
+jobs:
+  image:
+    name: Image and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the image name and tags
+        id: names
+        env:
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          image="${DOCKERHUB_IMAGE:-solderdemon/rosco-emulator}"
+
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+            tags="$version"
+            # 1.2.3 also moves 1.2 and latest along, but a prerelease such as
+            # 1.2.3-rc1 only ever gets its own tag.
+            case "$version" in
+              *-*)   ;;
+              *.*.*) tags="$tags ${version%.*} latest" ;;
+              *)     tags="$tags latest" ;;
+            esac
+          else
+            version="${INPUT_TAG:-edge}"
+            tags="$version"
+          fi
+
+          echo "image=$image"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags"       >> "$GITHUB_OUTPUT"
+          echo "building $image:$version (tags: $tags)"
+
+      - name: Build the image
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.names.outputs.version }}
+        run: docker build --tag "$IMAGE:$VERSION" .
+
+      # The same check CI runs, against the binary and ROMs as they sit in the
+      # image, before any of it is published.
+      - name: Smoke test the image
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          docker run --rm --entrypoint rosco-smoke-test "$IMAGE:$VERSION"
+
+      - name: Log in to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push to Docker Hub
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.names.outputs.version }}
+          TAGS: ${{ steps.names.outputs.tags }}
+        run: |
+          for tag in $TAGS; do
+            docker tag "$IMAGE:$VERSION" "$IMAGE:$tag"
+            docker push "$IMAGE:$tag"
+          done
+
+      # Taken out of the image that was just tested, so the tarball and the
+      # published image carry the exact same binary.
+      - name: Extract the binary
+        if: github.ref_type == 'tag'
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          mkdir -p dist
+          cid=$(docker create "$IMAGE:$VERSION")
+          docker cp "$cid:/opt/rosco/rosco" dist/rosco
+          docker rm "$cid"
+
+      - name: Package the release
+        if: github.ref_type == 'tag'
+        env:
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          dir="rosco-emulator-$VERSION-linux-x86_64"
+          mkdir -p "$dir/scripts"
+          cp dist/rosco "$dir/rosco"
+          chmod +x "$dir/rosco"
+          cp scripts/rosco-test.sh scripts/smoke-test.sh "$dir/scripts/"
+          cp -r roms bgfx "$dir/"
+          cp README.md COPYING "$dir/"
+          tar czf "$dir.tar.gz" "$dir"
+          sha256sum "$dir.tar.gz" > "$dir.tar.gz.sha256"
+          ls -lh "$dir.tar.gz"
+
+      - name: Create the GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.names.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "rosco-emulator-$VERSION-linux-x86_64.tar.gz" \
+            "rosco-emulator-$VERSION-linux-x86_64.tar.gz.sha256"

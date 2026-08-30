@@ -17,6 +17,9 @@
 !/src/
 !/.gitattributes
 !/.gitignore
+!/.github/
+!/.dockerignore
+!/Dockerfile
 !/makefile
 !/dist.mak
 !/*.md

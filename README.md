@@ -92,6 +92,77 @@ make -j$(nproc) REGENIE=1 USE_QTDEBUG=0
 makefile does not notice that they changed, so without it the previously
 generated project files are reused and the new setting is ignored.
 
+### Prebuilt binaries
+
+Every tagged release attaches `rosco-emulator-<version>-linux-x86_64.tar.gz`,
+holding the stripped binary, the ROM sets, the test scripts and the bgfx
+shaders. It is built on Ubuntu 22.04 without Qt, so it wants glibc 2.35 or
+newer - Ubuntu 22.04, Debian 12 or anything since - and the runtime halves of
+the packages above:
+
+```sh
+sudo apt install libsdl2-2.0-0 libsdl2-ttf-2.0-0 libfontconfig1 \
+    libx11-6 libxinerama1 libxext6 libxi6 libgl1 libasound2 libpulse0
+```
+
+Anything older, or further afield than Debian, is what the container image is
+for.
+
+## Docker
+
+```sh
+docker pull solderdemon/rosco-emulator
+docker run --rm --entrypoint rosco-smoke-test solderdemon/rosco-emulator
+```
+
+That second line boots all five machines and prints a line for each, which is
+the same check CI runs on every build.
+
+The image carries the emulator, the ROM sets and both test scripts. Its
+entrypoint is the emulator itself, so anything after the image name goes
+straight through to it, and the working directory is `/work`:
+
+```sh
+docker run --rm -v "$PWD:/work" solderdemon/rosco-emulator rosco_6502 \
+    -video none -nothrottle -seconds_to_run 8 \
+    -terminal null_modem -bitb console.txt
+```
+
+Headless is what the image is really for. Testing a firmware build from a
+Makefile, or from someone else's CI, takes one line:
+
+```sh
+docker run --rm -v "$PWD:/work" --entrypoint rosco-test \
+    solderdemon/rosco-emulator -e 'Memory checks: passed' boot32k.bin
+```
+
+The interactive terminal wants the X11 socket handed in, and `xhost +local:` on
+the host if the connection is refused:
+
+```sh
+docker run --rm -it -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix \
+    solderdemon/rosco-emulator rosco_m68k_010
+```
+
+The shipped ROM sets live in `/opt/rosco/roms`, which the `rompath` in
+`~/.rosco/rosco.ini` points at; a `roms/` directory inside `/work` is searched
+first, and `-rompath` on the command line overrides both. Sound and MIDI are
+turned off in that same ini - these machines have neither, and leaving them on
+means ALSA complaining about the `/dev/snd` that is not in the container on
+every single run. The emulator
+runs as uid 1000, so pass `--user "$(id -u):$(id -g)"` if what it writes into
+`/work` should belong to someone else.
+
+Building the image runs the same build as everywhere else, in a multi-stage
+Dockerfile that keeps only the runtime libraries in the result:
+
+```sh
+docker build -t rosco-emulator .
+```
+
+Adding `--target export --output type=local,dest=.` builds the binary alone and
+drops it in the current directory, if a container is not what you were after.
+
 ## Firmware
 
 The rosco firmware is built from source by its users rather than being a fixed
@@ -143,6 +214,16 @@ scripts/rosco-test.sh -q hello.bin -e 'hello, world'
 
 The firmware's own power-on self test walks every RAM and ROM bank, so the
 first of those is a real smoke test of the whole memory map.
+
+**`scripts/smoke-test.sh` does the same for the tree itself**: it boots every
+machine against the ROM sets in `roms/` and fails unless each one gets through
+its banner and out to a prompt. It needs nothing but a built binary, takes
+about eight seconds for all five, and is what CI runs on every push:
+
+```sh
+scripts/smoke-test.sh                    # all of them
+scripts/smoke-test.sh -t 16 rosco_6502   # one, given longer
+```
 
 Other options: `-t SECONDS` for how long to run (default 8 emulated seconds,
 about a second of wall clock), `-i` for a window instead of headless, `-r` to
