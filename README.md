@@ -65,9 +65,57 @@ run:
 | `roms/rosco_m68k_<cpu>.zip`| `rosco_m68k.rom`                               |
 | `roms/rosco_6502.zip`      | `rosco_6502.rom`, the four 8KB banks concatenated |
 
-The hashes in the drivers describe the builds this tree was tested against; if
-you drop in your own firmware, either update them or start the emulator with
-`-novalidate`.
+The hashes in the drivers describe the builds this tree was tested against. A
+different firmware only gets a `WRONG CHECKSUMS` warning and still runs, so
+there is no need to keep them in step while developing.
+
+## Testing firmware and programs
+
+`scripts/rosco-test.sh` boots a machine headless and prints whatever came out
+of the console serial port. It can run a firmware image, a program, or both.
+
+**A firmware image** is staged into a temporary ROM path, so `roms/` is left
+alone and the checksums in the drivers do not matter:
+
+```sh
+scripts/rosco-test.sh boot32k.bin
+scripts/rosco-test.sh -m rosco_m68k_010 -s sdcard.img rosco_m68k.rom
+```
+
+**A program** goes straight into memory with `-q`, no Kermit and no SD card
+needed. The firmware is left to finish booting first, then the program is
+loaded and jumped to:
+
+```sh
+scripts/rosco-test.sh -q hello.bin                      # on the stock firmware
+scripts/rosco-test.sh -q hello.bin boot32k.bin          # on your own firmware
+```
+
+Programs load at the address they are linked for: `$0800` on the rosco_6502 and
+`0x40000` on the rosco_m68k. Note that a bare program says nothing about which
+machine it is for, so pass `-m` unless the default guess is right.
+
+**`-e` turns a run into a pass/fail check**, which is what makes this usable
+from a Makefile or CI - it exits non-zero if the string never appears:
+
+```sh
+scripts/rosco-test.sh -e 'Memory checks: passed' boot32k.bin
+scripts/rosco-test.sh -q hello.bin -e 'hello, world'
+```
+
+The firmware's own power-on self test walks every RAM and ROM bank, so the
+first of those is a real smoke test of the whole memory map.
+
+Other options: `-t SECONDS` for how long to run (default 8 emulated seconds,
+about a second of wall clock), `-i` for a window instead of headless, `-r` to
+keep the ANSI escapes, and `--` to pass anything else through to the emulator.
+
+The emulator takes `-quik` directly too, if you would rather not go through the
+script:
+
+```sh
+./rosco rosco_6502 -quik hello.bin
+```
 
 ## Running
 

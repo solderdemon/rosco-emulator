@@ -40,6 +40,7 @@
 #include "cpu/m68000/m68010.h"
 #include "cpu/m68000/m68020.h"
 #include "cpu/m68000/m68030.h"
+#include "imagedev/snapquik.h"
 #include "machine/mc68681.h"
 #include "machine/spi_sdcard.h"
 
@@ -65,6 +66,8 @@ protected:
 	bool m_bus_error = false;
 
 	void rosco_m68k(machine_config &config);
+
+	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_cb);
 
 	void mem_map(address_map &map) ATTR_COLD;
 	void cpu_space_map(address_map &map) ATTR_COLD;
@@ -303,6 +306,39 @@ void rosco_m68k_state::rosco_m68k(machine_config &config)
 
 	ATA_INTERFACE(config, m_ata, 0).options(ata_devices, "hdd", nullptr, false);
 	m_ata->irq_handler().set_inputline(m_maincpu, M68K_IRQ_3);
+
+	// Drop a raw binary straight into memory instead of sending it over
+	// Kermit or putting it on the SD card. The delay lets the firmware
+	// finish bringing the hardware up before control is handed over.
+	QUICKLOAD(config, "quickload", "bin,rom", attotime::from_seconds(3))
+			.set_load_callback(FUNC(rosco_m68k_state::quickload_cb));
+}
+
+/*
+ * Programs are linked to load and start at 0x40000, which is where the
+ * firmware puts them when they arrive over Kermit.
+ */
+QUICKLOAD_LOAD_MEMBER(rosco_m68k_state::quickload_cb)
+{
+	constexpr offs_t LOAD_ADDRESS = 0x40000;
+	constexpr offs_t RAM_END = 0x100000;
+
+	const uint64_t length = image.length();
+
+	if (!length || (length > (RAM_END - LOAD_ADDRESS)))
+		return std::make_pair(image_error::INVALIDLENGTH, std::string());
+
+	std::vector<uint8_t> buffer(length);
+	if (image.fread(&buffer[0], length) != length)
+		return std::make_pair(image_error::UNSPECIFIED, "Error reading file");
+
+	address_space &space = m_maincpu->space(AS_PROGRAM);
+	for (offs_t i = 0; i < length; i++)
+		space.write_byte(LOAD_ADDRESS + i, buffer[i]);
+
+	m_maincpu->set_pc(LOAD_ADDRESS);
+
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 void rosco_m68k_state::write_red_led(int state)

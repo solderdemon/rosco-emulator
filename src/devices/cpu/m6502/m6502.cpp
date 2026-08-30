@@ -464,6 +464,10 @@ void m6502_device::state_import(const device_state_entry &entry)
 		prefetch_end();
 		m_PPC = m_NPC;
 		m_inst_state = m_IR | m_inst_state_base;
+		// The core is interruptible, so PC can be imported part-way through
+		// an instruction. Leaving the substate behind would make execute_run()
+		// resume the new instruction in the middle of the old one.
+		m_inst_substate = 0;
 		break;
 	}
 }

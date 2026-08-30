@@ -35,6 +35,7 @@
 
 #include "bus/rs232/rs232.h"
 #include "cpu/m6502/w65c02s.h"
+#include "imagedev/snapquik.h"
 #include "machine/mc68681.h"
 #include "machine/spi_sdcard.h"
 
@@ -65,6 +66,8 @@ private:
 	static constexpr offs_t ROM_BANK_SIZE = 0x2000;
 
 	void mem_map(address_map &map) ATTR_COLD;
+
+	DECLARE_QUICKLOAD_LOAD_MEMBER(quickload_cb);
 
 	virtual void machine_start() override ATTR_COLD;
 	virtual void machine_reset() override ATTR_COLD;
@@ -227,6 +230,41 @@ void rosco_6502_state::rosco_6502(machine_config &config)
 
 	SPI_SDCARD(config, m_sdcard, 0);
 	m_sdcard->spi_miso_callback().set(m_duart, FUNC(xr68c681_device::ip2_w));
+
+	// Drop a raw binary straight into memory instead of pasting Intel hex
+	// into the monitor or putting it on the SD card. The delay lets the
+	// firmware finish its power-on self test before control is handed over.
+	QUICKLOAD(config, "quickload", "bin", attotime::from_seconds(3))
+			.set_load_callback(FUNC(rosco_6502_state::quickload_cb));
+}
+
+/*
+ * Programs are linked to load and start at $0800, the bottom of the user area
+ * in low RAM. Everything below that belongs to the firmware.
+ */
+QUICKLOAD_LOAD_MEMBER(rosco_6502_state::quickload_cb)
+{
+	constexpr offs_t LOAD_ADDRESS = 0x0800;
+	constexpr offs_t LOW_RAM_END = 0x4000;
+
+	const uint64_t length = image.length();
+
+	if (!length || (length > (LOW_RAM_END - LOAD_ADDRESS)))
+		return std::make_pair(image_error::INVALIDLENGTH, std::string());
+
+	std::vector<uint8_t> buffer(length);
+	if (image.fread(&buffer[0], length) != length)
+		return std::make_pair(image_error::UNSPECIFIED, "Error reading file");
+
+	address_space &space = m_maincpu->space(AS_PROGRAM);
+	for (offs_t i = 0; i < length; i++)
+		space.write_byte(LOAD_ADDRESS + i, buffer[i]);
+
+	// set_pc() goes through STATE_GENPC, which the m6502 core exports but
+	// never imports; M6502_PC is the one that restarts the prefetch.
+	m_maincpu->set_state_int(M6502_PC, LOAD_ADDRESS);
+
+	return std::make_pair(std::error_condition(), std::string());
 }
 
 /******************************************************************************
