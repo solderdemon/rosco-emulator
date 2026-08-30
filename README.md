@@ -46,6 +46,32 @@ loop runs through more iterations than it would on real silicon.
 ## Building
 
 Requires a C++20 compiler, Python 3, SDL2 and the usual MAME build dependencies.
+On Debian/Ubuntu:
+
+```sh
+sudo apt install build-essential git python3 pkg-config \
+    libsdl2-dev libsdl2-ttf-dev libfontconfig-dev \
+    libx11-dev libxinerama-dev libxext-dev libxi-dev libgl-dev \
+    libasound2-dev libpulse-dev qt6-base-dev
+```
+
+| Package                          | Needed for                                        |
+| -------------------------------- | ------------------------------------------------- |
+| `build-essential`                | g++ and make                                      |
+| `git`, `python3`, `pkg-config`   | the build scripts and dependency probing          |
+| `libsdl2-dev`, `libsdl2-ttf-dev` | the SDL OSD: video, input, on-screen text         |
+| `libfontconfig-dev`              | finding the UI font                               |
+| `libx11-dev`, `libxinerama-dev`  | the X11 window and multi-monitor handling         |
+| `libxext-dev`, `libxi-dev`       | XInput                                            |
+| `libgl-dev`                      | the OpenGL renderer                               |
+| `libasound2-dev`                 | ALSA, used by the MIDI module                     |
+| `libpulse-dev`                   | the PulseAudio sound module                       |
+| `qt6-base-dev`                   | the Qt debugger, see below                        |
+
+Everything else MAME needs - zlib, expat, Lua, FLAC, SQLite, PortAudio, PortMidi
+and the rest - is bundled in `3rdparty/` and built from source, so there are no
+other packages to install. `libpipewire-0.3-dev` is picked up if it happens to be
+installed and silently skipped otherwise.
 
 ```sh
 make -j$(nproc)
@@ -53,6 +79,18 @@ make -j$(nproc)
 
 `rosco` is the default target, so no `TARGET=` is needed. The resulting binary is
 `./rosco` in the top of the tree.
+
+Qt is only there for the debugger, and it is the one dependency worth dropping if
+you do not want it - `qt6-base-dev` pulls in a lot for what it is. Building
+without it gives you the SDL debugger instead, and `-debug` still works:
+
+```sh
+make -j$(nproc) REGENIE=1 USE_QTDEBUG=0
+```
+
+`REGENIE=1` is needed on the first build after changing any of these options: the
+makefile does not notice that they changed, so without it the previously
+generated project files are reused and the new setting is ignored.
 
 ## Firmware
 
