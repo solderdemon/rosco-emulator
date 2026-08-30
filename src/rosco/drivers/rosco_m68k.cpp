@@ -270,7 +270,9 @@ void rosco_m68k_state::rosco_m68k(machine_config &config)
 	// OP6 = SPI_COPI
 	// OP7 = SPI_CS1
 
-	XR68C681(config, m_duart, 10_MHz_XTAL);
+	// The DUART runs from its own 3.6864MHz crystal, not the CPU clock - the
+	// baud rates and the firmware's 100Hz timer tick both depend on it.
+	XR68C681(config, m_duart, 3.6864_MHz_XTAL);
 	m_duart->irq_cb().set_inputline(m_maincpu, M68K_IRQ_4);
 	m_duart->a_tx_cb().set(m_terminal, FUNC(rs232_port_device::write_txd));
 	m_duart->outport_cb().set(m_terminal, FUNC(rs232_port_device::write_rts)).bit(0);

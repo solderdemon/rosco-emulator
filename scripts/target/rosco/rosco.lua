@@ -20,7 +20,7 @@
 -- 68000/68010/68020/68030 - rosco_m68k Classic, Classic v2 and r1
 CPUS["M680X0"] = true
 
--- W65C02S - kept for the future rosco_6502 driver
+-- W65C02S - rosco_6502
 CPUS["M6502"] = true
 
 --------------------------------------------------
@@ -98,6 +98,7 @@ function createProjects_rosco_rosco(_target, _subtarget)
 
 	files {
 		MAME_DIR .. "src/rosco/drivers/rosco_m68k.cpp",
+		MAME_DIR .. "src/rosco/drivers/rosco_6502.cpp",
 	}
 end
 

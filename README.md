@@ -1,16 +1,17 @@
 # rosco-emulator
 
-An emulator for the [rosco_m68k](https://github.com/rosco-m68k/rosco_m68k) family of homebrew
-single board computers, built as a slimmed-down MAME target.
+An emulator for the [rosco_m68k](https://github.com/rosco-m68k/rosco_m68k) and
+[rosco_6502](https://github.com/rosco-6502/rosco_6502) homebrew single board
+computers, built as a slimmed-down MAME target.
 
 This tree is MAME 0.289 with everything unrelated to rosco removed. The only
-driver that remains lives in `src/rosco/drivers`, and the build produces a
+drivers that remain live in `src/rosco/drivers`, and the build produces a
 single `rosco` executable instead of the full MAME binary.
 
-The rosco driver originates from the SBC MAME fork at
-[roscopeco/mame](https://github.com/roscopeco/mame), which is where the
-rosco_m68k machines were first emulated. It has been ported forward to current
-MAME here - see [Credits](#credits).
+The rosco_m68k driver originates from the SBC MAME fork at
+[roscopeco/mame](https://github.com/roscopeco/mame), which is where these
+machines were first emulated, and has been ported forward to current MAME here.
+The rosco_6502 driver is new - see [Credits](#credits).
 
 ## Emulated systems
 
@@ -20,15 +21,27 @@ MAME here - see [Credits](#credits).
 | `rosco_m68k_010` | rosco_m68k Classic V2, MC68010 |
 | `rosco_m68k_020` | rosco_m68k Classic V2, MC68020 |
 | `rosco_m68k_030` | rosco_m68k Classic V2, MC68030 |
+| `rosco_6502`     | rosco_6502 r4, W65C02S         |
 
-The Classic V2 machines emulate 1MB of DRAM, the XR68C681 DUART with both
+The **Classic V2** machines emulate 1MB of DRAM, the XR68C681 DUART with both
 serial channels, the bit-banged SPI SD card hanging off the DUART output port,
 and the IDE/ATA interface. Unmapped addresses raise a bus error, which is what
 the firmware uses to size memory and probe for expansion hardware.
 
-CPU cores for both the 68000 family and the W65C02S are enabled in the build,
-the latter so that a `rosco_6502` driver can be added later without touching the
-target configuration.
+The **rosco_6502** emulates the W65C02S at 14MHz, 16KB of low RAM, 16 banks of
+32KB high RAM (512KB), 4 banks of 8KB ROM and the same XR68C681 DUART and SPI
+SD card wiring as its bigger sibling. Banking goes through the register at
+$0000, which the address decoder mirrors at $0001 and reads back from the RAM
+underneath. The firmware's own power-on self test walks every RAM and ROM bank,
+so a clean boot exercises the whole memory map.
+
+### Known limitations
+
+The firmware measures CPU speed against the DUART timer and prints the result
+at boot. It comes out right for the 68000, 68010 and W65C02S, but the 68020 and
+68030 read about twice their configured 20MHz: MAME's Musashi cores do not
+model the prefetch and cache behaviour those parts have, so the calibration
+loop runs through more iterations than it would on real silicon.
 
 ## Building
 
@@ -43,11 +56,18 @@ make -j$(nproc)
 
 ## Firmware
 
-The rosco_m68k firmware is built from source by its users rather than being a
-fixed ROM dump, so `roms/rosco_m68k_<cpu>.zip` just needs to contain whatever
-`rosco_m68k.rom` you want to run. The hashes in `src/rosco/drivers/rosco_m68k.cpp`
-describe the build that this tree was tested against; if you drop in your own
-firmware, either update them or start the emulator with `-novalidate`.
+The rosco firmware is built from source by its users rather than being a fixed
+ROM dump, so the ROM sets just need to contain whatever firmware you want to
+run:
+
+| ROM set                    | Contents                                       |
+| -------------------------- | ---------------------------------------------- |
+| `roms/rosco_m68k_<cpu>.zip`| `rosco_m68k.rom`                               |
+| `roms/rosco_6502.zip`      | `rosco_6502.rom`, the four 8KB banks concatenated |
+
+The hashes in the drivers describe the builds this tree was tested against; if
+you drop in your own firmware, either update them or start the emulator with
+`-novalidate`.
 
 ## Running
 
@@ -68,10 +88,12 @@ An SD card image goes on the first hard disk slot and the IDE disk on the second
 
 ```sh
 ./rosco rosco_m68k_010 -hard1 sdcard.img -hard2 ide.chd
+./rosco rosco_6502 -hard1 sdcard.img
 ```
 
 Raw images work as-is; `.chd` images can be created with `chdman`, built by
-`make TOOLS=1`.
+`make TOOLS=1`. The rosco_6502 has no IDE interface, so it only takes the SD
+card.
 
 ## Credits
 
@@ -81,8 +103,13 @@ contributors, with portions by Chris Hanson. Porting them to MAME 0.289
 required updating the bus error handling for the rewritten 68000 core and the
 usual API churn; the hardware emulation itself is theirs.
 
-The rosco_m68k computer itself is by
-[The Really Old-School Company](https://github.com/rosco-m68k/rosco_m68k).
+The rosco_6502 driver was written for this tree from the board's schematic,
+PLD equations and firmware sources, which document the memory map and the DUART
+pin assignments in full.
+
+The rosco computers themselves are by The Really Old-School Company:
+[rosco_m68k](https://github.com/rosco-m68k/rosco_m68k) and
+[rosco_6502](https://github.com/rosco-6502/rosco_6502).
 
 ## License
 
