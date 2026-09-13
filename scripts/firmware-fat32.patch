@@ -1,0 +1,11 @@
+--- a/fat32_readonly.s
++++ b/fat32_readonly.s
+@@ -1021,6 +1021,7 @@
+                         ; Advance FS_ZP_ADDRPTR by 512 bytes
+                         lda     FS_ZP_ADDRPTR+1
+-                        adc     #2                      ; carry already clear
++                        clc                             ; CMP above sets carry for a nonzero sector result
++                        adc     #2
+                         sta     FS_ZP_ADDRPTR+1
+                         cmp     #>(BANK_RAM_ADDR+BANK_RAM_SIZE)
+                         blt     @notnextbank

@@ -278,7 +278,7 @@ QUICKLOAD_LOAD_MEMBER(rosco_6502_state::quickload_cb)
  */
 ROM_START( rosco_6502 )
 	ROM_REGION(0x8000, "rom", 0)
-	ROM_LOAD( "rosco_6502.rom", 0x0000, 0x8000, CRC(213c7751) SHA1(004ee5c6359e2f37a9e02c805ddfe713020838ae) )
+	ROM_LOAD( "rosco_6502.rom", 0x0000, 0x8000, CRC(4ed0320a) SHA1(81c9437101175a64912d2863ad48ee4ac002d80e) )
 ROM_END
 
 } // anonymous namespace

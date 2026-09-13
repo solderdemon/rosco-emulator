@@ -33,6 +33,7 @@ EMU="$ROOT/rosco"
 
 machine=""
 program=""
+sdprogram=""
 seconds=8
 sdcard=""
 interactive=0
@@ -44,11 +45,12 @@ usage()
 	cat >&2 <<EOF
 Usage: ${0##*/} [options] [firmware]
 
-Runs <firmware> as the machine's ROM. With -q the ROM is left alone and a
-program is loaded straight into memory instead, so <firmware> is optional.
+Runs <firmware> as the machine's ROM. With -p or -q, <firmware> is optional.
 
   -m MACHINE   system to run (default: guessed from the image size)
                rosco_6502, rosco_m68k_000/_010/_020/_030
+  -p PROGRAM   boot a rosco_6502 program through firmware and a temporary
+               FAT32 SD card (requires python3, dosfstools and mtools)
   -q PROGRAM   load PROGRAM into RAM once the firmware is up and run it
                (rosco_6502: \$0800, rosco_m68k: 0x40000)
   -t SECONDS   emulated seconds to run headless (default: $seconds)
@@ -63,9 +65,10 @@ EOF
 	exit 2
 }
 
-while getopts ":m:q:t:s:e:irh" opt; do
+while getopts ":m:p:q:t:s:e:irh" opt; do
 	case "$opt" in
 		m) machine="$OPTARG" ;;
+		p) sdprogram="$OPTARG" ;;
 		q) program="$OPTARG" ;;
 		t) seconds="$OPTARG" ;;
 		s) sdcard="$OPTARG" ;;
@@ -80,10 +83,18 @@ done
 shift $((OPTIND - 1))
 
 firmware=""
-if [ $# -ge 1 ]; then
+if [ $# -ge 1 ] && [[ "$1" != -* ]]; then
 	firmware="$1"; shift
-elif [ -z "$program" ]; then
+elif [ -z "$program" ] && [ -z "$sdprogram" ]; then
 	usage
+fi
+
+if [ -n "$sdprogram" ]; then
+	[ -z "$program" ] && [ -z "$sdcard" ] ||
+		{ echo "${0##*/}: -p cannot be combined with -q or -s" >&2; exit 2; }
+	machine="${machine:-rosco_6502}"
+	[ "$machine" = rosco_6502 ] ||
+		{ echo "${0##*/}: -p supports rosco_6502 only" >&2; exit 2; }
 fi
 
 [ -x "$EMU" ] || { echo "${0##*/}: $EMU not built - run make first" >&2; exit 1; }
@@ -122,6 +133,10 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 args=( "$machine" -skip_gameinfo )
+if [ -n "$sdprogram" ]; then
+	sdcard="$work/sdcard.img"
+	python3 "$ROOT/scripts/make-sdcard.py" "$sdprogram" "$sdcard"
+fi
 if [ -n "$firmware" ]; then
 	mkdir -p "$work/roms/$machine"
 	cp "$firmware" "$work/roms/$machine/$romname"
@@ -131,7 +146,8 @@ fi
 [ -n "$sdcard" ] && args+=( -hard1 "$sdcard" )
 
 if [ "$interactive" -eq 1 ]; then
-	exec "$EMU" "${args[@]}" "$@"
+	"$EMU" "${args[@]}" "$@"
+	exit $?
 fi
 
 # The SDL OSD opens a video device whatever -video says and exits if it cannot,
@@ -143,9 +159,14 @@ export SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-dummy}"
 console="$work/console.txt"
 : > "$console"
 args+=( -terminal null_modem -bitb "$console"
-        -video none -sound none -nothrottle -seconds_to_run "$seconds" )
+        -video none -sound none -midiprovider none -nothrottle -seconds_to_run "$seconds" )
 
-"$EMU" "${args[@]}" "$@" >"$work/emu.log" 2>&1 || true
+status=0
+"$EMU" "${args[@]}" "$@" >"$work/emu.log" 2>&1 || status=$?
+if [ "$status" -ne 0 ]; then
+	cat "$work/emu.log" >&2
+	exit "$status"
+fi
 grep -iE "WRONG CHECKSUMS|NOT FOUND|Fatal error" "$work/emu.log" >&2 || true
 
 if [ "$raw" -eq 1 ]; then

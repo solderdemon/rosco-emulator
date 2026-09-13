@@ -81,6 +81,7 @@ jobs:
           VERSION: ${{ steps.names.outputs.version }}
         run: |
           docker run --rm --entrypoint rosco-smoke-test "$IMAGE:$VERSION"
+          docker run --rm --entrypoint python3 "$IMAGE:$VERSION" /opt/rosco/scripts/test-sd-boot.py
 
       - name: Log in to Docker Hub
         if: env.PUBLISH == 'true'
@@ -123,7 +124,7 @@ jobs:
           mkdir -p "$dir/scripts"
           cp dist/rosco "$dir/rosco"
           chmod +x "$dir/rosco"
-          cp scripts/rosco-test.sh scripts/smoke-test.sh "$dir/scripts/"
+          cp scripts/rosco-test.sh scripts/smoke-test.sh scripts/make-sdcard.py scripts/test-sd-boot.py "$dir/scripts/"
           cp -r roms bgfx "$dir/"
           cp README.md COPYING "$dir/"
           tar czf "$dir.tar.gz" "$dir"

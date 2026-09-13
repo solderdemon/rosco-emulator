@@ -191,7 +191,30 @@ scripts/rosco-test.sh boot32k.bin
 scripts/rosco-test.sh -m rosco_m68k_010 -s sdcard.img rosco_m68k.rom
 ```
 
-**A program** goes straight into memory with `-q`, no Kermit and no SD card
+**A rosco_6502 program** normally boots through the firmware from a temporary
+FAT32 SD card. `-p` creates the card with `/ROSC0DE_6502.BIN`, then the ROM
+loads it at `$0800` and calls it. Returning with `RTS` goes back to WozMon.
+The image is removed when the emulator exits, including interactive runs.
+
+```sh
+sudo apt install python3 dosfstools mtools
+scripts/rosco-test.sh -p hello.bin -e 'hello, world'
+scripts/rosco-test.sh -i -p hello.bin
+scripts/rosco-test.sh -p hello.bin boot32k.bin
+```
+
+These dependencies are included in the Docker image. `-p` is for rosco_6502
+only and cannot be combined with `-q` or `-s`. The image helper accepts
+programs up to 512 KiB; quickload is limited to 14 KiB on the 6502. For an existing SD image, use
+`-s sdcard.img` with a firmware image, or pass `-hard1 sdcard.img` directly
+to the emulator. To keep a generated card:
+
+```sh
+python3 scripts/make-sdcard.py hello.bin sdcard.img
+./rosco rosco_6502 -hard1 sdcard.img
+```
+
+**Quickload** goes straight into memory with `-q`, no Kermit and no SD card
 needed. The firmware is left to finish booting first, then the program is
 loaded and jumped to:
 
@@ -214,6 +237,18 @@ scripts/rosco-test.sh -q hello.bin -e 'hello, world'
 
 The firmware's own power-on self test walks every RAM and ROM bank, so the
 first of those is a real smoke test of the whole memory map.
+
+The SD regression test boots programs spanning multiple sectors and RAM banks,
+checks their return to WozMon, and checks that quickload still runs:
+
+```sh
+python3 scripts/test-sd-boot.py
+```
+
+The bundled 6502 ROM comes from hardware repository commit
+`d04e33043924147a309b692fe241f6d1910d6580`, with the sector-address fix in
+`scripts/firmware-fat32.patch`. See [ROM provenance](roms/README.md) for
+checksums and rebuild instructions.
 
 **`scripts/smoke-test.sh` does the same for the tree itself**: it boots every
 machine against the ROM sets in `roms/` and fails unless each one gets through

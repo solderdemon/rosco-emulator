@@ -65,12 +65,15 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 		libgl1 \
 		libpulse0 \
 		fonts-dejavu-core \
+		python3 dosfstools mtools \
 	&& (apt-get install --no-install-recommends -y libasound2t64 \
 		|| apt-get install --no-install-recommends -y libasound2) \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /src/rosco			/opt/rosco/rosco
 COPY --from=builder /src/scripts/rosco-test.sh	/opt/rosco/scripts/rosco-test.sh
+COPY --from=builder /src/scripts/test-sd-boot.py /opt/rosco/scripts/test-sd-boot.py
+COPY --from=builder /src/scripts/make-sdcard.py /opt/rosco/scripts/make-sdcard.py
 COPY --from=builder /src/scripts/smoke-test.sh	/opt/rosco/scripts/smoke-test.sh
 COPY --from=builder /src/scripts/docker-entrypoint.sh	/opt/rosco/scripts/docker-entrypoint.sh
 COPY --from=builder /src/roms			/opt/rosco/roms

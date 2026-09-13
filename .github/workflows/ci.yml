@@ -26,7 +26,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            build-essential python3 pkg-config ccache \
+            build-essential python3 pkg-config ccache dosfstools mtools \
             libsdl2-dev libsdl2-ttf-dev libfontconfig-dev \
             libx11-dev libxinerama-dev libxext-dev libxi-dev libgl-dev \
             libasound2-dev libpulse-dev
@@ -52,7 +52,9 @@ jobs:
         run: ccache --show-stats
 
       - name: Smoke test
-        run: scripts/smoke-test.sh
+        run: |
+          scripts/smoke-test.sh
+          python3 scripts/test-sd-boot.py
 
       - name: Upload the binary
         uses: actions/upload-artifact@v4
